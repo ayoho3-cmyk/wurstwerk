@@ -104,6 +104,12 @@
   .cart .btn { width: 100%; justify-content: center; margin-top: 16px; }
   .cart .fine { font-size: 12.5px; color: #6e6352; margin: 10px 0 0; }
   .toast { display: none; margin-top: 12px; padding: 12px; border-radius: 10px; background: #e7f3e2; color: #1d4a14; font-size: 14px; }
+  .toast.err { background: #fbe4e1; color: #7a1610; }
+  #pay-block[hidden] { display: none; }
+  #card-container { min-height: 90px; margin-top: 4px; }
+  .done { text-align: center; padding: 10px 0 4px; }
+  .done h4 { font-family: "Bebas Neue"; font-size: 30px; letter-spacing: .05em; color: var(--red); margin: 0 0 6px; }
+  .done p { margin: 0 0 8px; font-size: 15px; }
 
   /* events */
   .events { position: relative; border-top: 2px solid var(--brass); background: radial-gradient(600px 400px at 25% 50%, rgba(255,42,31,.16), transparent 70%), var(--ink-2); }
@@ -173,8 +179,12 @@
             <select id="f-time" name="time" required></select>
             <label for="f-notes">Notes</label>
             <textarea id="f-notes" name="notes" placeholder="Allergies, extra sauerkraut, etc."></textarea>
+            <div id="pay-block" hidden>
+              <label>Card</label>
+              <div id="card-container"></div>
+            </div>
             <button class="btn" id="submit-btn" type="submit" disabled>Send Order</button>
-            <p class="fine">Pay at drop-off. Orders are confirmed once we reply.</p>
+            <p class="fine" id="fine">Pay at drop-off. Orders are confirmed once we reply.</p>
             <div class="toast" id="toast" role="status"></div>
           </form>
         </aside>
@@ -212,42 +222,44 @@
 
 <script>
 /* ========= EDIT ME ========= */
+// Menu items and prices live in menu.json (the payment code reads the same file).
 const CONFIG = {
-  orderEmail: "orders@wurstwerk.party",   // where drop-off orders are sent
+  orderEmail: "orders@wurstwerk.party",   // where drop-off orders are sent (when online payment is off)
   eventEmail: "events@wurstwerk.party",   // where event inquiries go
   dropoffStart: "11:00", dropoffEnd: "20:00", slotMinutes: 15,
-  menu: [
-    { cat: "Sausages", items: [
-      { id: "brat",  name: "Classic Bratwurst",       price: 10,  desc: "Berkshire pork on a poppyseed bun, with sauerkraut and spicy mustard." },
-      { id: "curry", name: "Currywurst",              price: 12, desc: "Berkshire pork currywurst, poppyseed bun, curry ketchup, pepper relish." }
-    ]},
-    { cat: "Sides", items: [
-      { id: "kart",  name: "German Potato Salad",     price: 4,  desc: "Crispy potatoes, bacon mustard vinaigrette, chives." }
-    ]}
-  ]
 };
 /* =========================== */
 
 const cart = {};
 const money = n => "$" + n.toFixed(2);
-const allItems = CONFIG.menu.flatMap(c => c.items);
+let MENU = [], allItems = [];
+let card = null;              // Square card field, when online payment is on
 
-// Render menu
-document.getElementById("menu").innerHTML = CONFIG.menu.map(c => `
-  <div class="menu-cat">
-    <h3>${c.cat}</h3>
-    ${c.items.map(i => `
-      <div class="item">
-        <div><h4>${i.name}<small>${money(i.price)}</small></h4><p>${i.desc}</p></div>
-        <div class="qty">
-          <button type="button" aria-label="Remove one ${i.name}" data-id="${i.id}" data-d="-1">−</button>
-          <output id="q-${i.id}">0</output>
-          <button type="button" aria-label="Add one ${i.name}" data-id="${i.id}" data-d="1">+</button>
-        </div>
-      </div>`).join("")}
-  </div>`).join("");
+const $ = id => document.getElementById(id);
+function toast(msg, isError) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast" + (isError ? " err" : "");
+  t.style.display = msg ? "block" : "none";
+}
 
-document.getElementById("menu").addEventListener("click", e => {
+function renderMenu() {
+  $("menu").innerHTML = MENU.map(c => `
+    <div class="menu-cat">
+      <h3>${c.cat}</h3>
+      ${c.items.map(i => `
+        <div class="item">
+          <div><h4>${i.name}<small>${money(i.price)}</small></h4><p>${i.desc}</p></div>
+          <div class="qty">
+            <button type="button" aria-label="Remove one ${i.name}" data-id="${i.id}" data-d="-1">−</button>
+            <output id="q-${i.id}">0</output>
+            <button type="button" aria-label="Add one ${i.name}" data-id="${i.id}" data-d="1">+</button>
+          </div>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
+$("menu").addEventListener("click", e => {
   const b = e.target.closest("button[data-id]");
   if (!b) return;
   const id = b.dataset.id;
@@ -257,26 +269,27 @@ document.getElementById("menu").addEventListener("click", e => {
 });
 
 function renderCart() {
-  const list = document.getElementById("cart-list");
   let total = 0;
   const rows = allItems.filter(i => cart[i.id]).map(i => {
     const line = cart[i.id] * i.price; total += line;
     return `<li><span>${cart[i.id]} × ${i.name}</span><span>${money(line)}</span></li>`;
   });
   allItems.forEach(i => {
-    const q = document.getElementById("q-" + i.id);
+    const q = $("q-" + i.id);
     q.textContent = cart[i.id] || 0;
     q.closest(".item").classList.toggle("in-cart", !!cart[i.id]);
   });
-  list.innerHTML = rows.length ? rows.join("") : '<li class="empty">Nothing yet — add some sausage!</li>';
-  document.getElementById("cart-total").textContent = money(total);
-  document.getElementById("submit-btn").disabled = !rows.length;
+  $("cart-list").innerHTML = rows.length ? rows.join("") : '<li class="empty">Nothing yet — add some sausage!</li>';
+  $("cart-total").textContent = money(total);
+  const btn = $("submit-btn");
+  btn.disabled = !rows.length;
+  btn.textContent = card ? (rows.length ? `Pay ${money(total)} & Place Order` : "Place Order") : "Send Order";
   return total;
 }
 
 // Drop-off time slots
 (function () {
-  const sel = document.getElementById("f-time");
+  const sel = $("f-time");
   const [sh, sm] = CONFIG.dropoffStart.split(":").map(Number);
   const [eh, em] = CONFIG.dropoffEnd.split(":").map(Number);
   for (let m = sh * 60 + sm; m <= eh * 60 + em; m += CONFIG.slotMinutes) {
@@ -286,24 +299,103 @@ function renderCart() {
   }
 })();
 
-// Submit order -> opens email with the full order
-document.getElementById("order-form").addEventListener("submit", e => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const total = renderCart();
-  const lines = allItems.filter(i => cart[i.id]).map(i => `${cart[i.id]} x ${i.name} — ${money(cart[i.id] * i.price)}`);
+// Turn on Square card payments if the server has them configured; otherwise stay on email ordering.
+async function setupPayments() {
+  try {
+    const cfg = await fetch("/api/config", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+    if (!cfg || !cfg.enabled) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = cfg.env === "production" ? "https://web.squarecdn.com/v1/square.js" : "https://sandbox.web.squarecdn.com/v1/square.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    const payments = window.Square.payments(cfg.appId, cfg.locationId);
+    const c = await payments.card();
+    await c.attach("#card-container");
+    card = c;
+    $("pay-block").hidden = false;
+    $("fine").textContent = cfg.env === "production"
+      ? "Secure card payment by Square. You'll get a confirmation as soon as you order."
+      : "TEST MODE — use Square's sandbox test card 4111 1111 1111 1111. No real charges.";
+    renderCart();
+  } catch (err) {
+    console.warn("Online payment unavailable, using email ordering.", err);
+  }
+}
+
+function orderLines() {
+  return allItems.filter(i => cart[i.id]).map(i => `${cart[i.id]} x ${i.name} — ${money(cart[i.id] * i.price)}`);
+}
+
+function sendByEmail(f, total) {
   const body = [
     "NEW WURSTWERK ORDER", "",
-    ...lines, "", `TOTAL: ${money(total)}`, "",
+    ...orderLines(), "", `TOTAL: ${money(total)}`, "",
     `Name: ${f.get("name")}`, `Phone: ${f.get("phone")}`, `Email: ${f.get("email") || "-"}`,
     `Drop-off address: ${f.get("address")}`, `Drop-off time: ${f.get("time")}`, `Notes: ${f.get("notes") || "-"}`
   ].join("\n");
   const subject = `Drop-off order — ${f.get("name")} @ ${f.get("time")}`;
   location.href = `mailto:${CONFIG.orderEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  const t = document.getElementById("toast");
-  t.textContent = "Your email app should open with your order — hit send and we'll confirm shortly. Thank you!";
-  t.style.display = "block";
+  toast("Your email app should open with your order — hit send and we'll confirm shortly. Thank you!");
+}
+
+async function payWithCard(form, f) {
+  const btn = $("submit-btn");
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Processing…";
+  toast("");
+  try {
+    const tok = await card.tokenize();
+    if (tok.status !== "OK") throw new Error("Please check your card details.");
+    const res = await fetch("/api/pay", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceId: tok.token,
+        idempotencyKey: crypto.randomUUID(),
+        items: { ...cart },
+        customer: Object.fromEntries(["name", "phone", "email", "address", "time", "notes"].map(k => [k, f.get(k) || ""])),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "Payment didn't go through. Please try again.");
+
+    const lines = orderLines().map(l => `<li>${l}</li>`).join("");
+    form.innerHTML = `
+      <div class="done">
+        <h4>Order placed — thank you!</h4>
+        <p>Paid ${money(data.total / 100)} · Order ${data.reference}</p>
+        <p>We'll drop it off at <strong>${f.get("time")}</strong>.</p>
+        ${data.receiptUrl ? `<p><a href="${data.receiptUrl}" target="_blank" rel="noopener">View your receipt</a></p>` : ""}
+      </div>`;
+    $("cart-list").innerHTML = lines;
+    document.querySelectorAll(".qty button").forEach(b => b.disabled = true);
+  } catch (err) {
+    toast(err.message || "Something went wrong. Your card was not charged.", true);
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+$("order-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const total = renderCart();
+  if (!total) return;
+  if (card) payWithCard(e.target, f);
+  else sendByEmail(f, total);
 });
+
+fetch("menu.json", { cache: "no-cache" })
+  .then(r => r.json())
+  .then(m => {
+    MENU = m.categories;
+    allItems = MENU.flatMap(c => c.items);
+    renderMenu();
+    renderCart();
+    setupPayments();
+  })
+  .catch(() => { $("menu").innerHTML = "<p>Menu couldn't load — please refresh.</p>"; });
 
 // Event booking mailto
 const evSubject = encodeURIComponent("Event booking inquiry — WurstWerk");

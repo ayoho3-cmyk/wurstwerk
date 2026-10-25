@@ -151,3 +151,6 @@ vite.config.ts.timestamp-*
 # WurstWerk local files
 .claude/
 *.zip
+.dev.vars
+.wrangler/
+node_modules/
