@@ -10,7 +10,10 @@ const json = (data, status = 200) =>
 const clean = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 export async function onRequestPost({ request, env }) {
-  if (!env.SQUARE_ACCESS_TOKEN || !env.SQUARE_LOCATION_ID) {
+  // Trim stray spaces/newlines that sneak in when pasting the token into the dashboard
+  const token = String(env.SQUARE_ACCESS_TOKEN || "").trim();
+  const locationId = String(env.SQUARE_LOCATION_ID || "").trim();
+  if (!token || !locationId) {
     return json({ error: "Online payments are not set up yet." }, 503);
   }
 
@@ -66,7 +69,7 @@ export async function onRequestPost({ request, env }) {
     source_id: sourceId,
     idempotency_key: idempotencyKey,
     amount_money: { amount: cents, currency: "USD" },
-    location_id: env.SQUARE_LOCATION_ID,
+    location_id: locationId,
     reference_id: `WW-${idempotencyKey.slice(0, 8)}`,
     note,
   };
@@ -77,7 +80,7 @@ export async function onRequestPost({ request, env }) {
     res = await fetch(`${host}/v2/payments`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
         "Square-Version": SQUARE_VERSION,
       },
@@ -91,6 +94,17 @@ export async function onRequestPost({ request, env }) {
   if (!res.ok || data.payment?.status !== "COMPLETED") {
     const err = data.errors?.[0];
     console.log("Square payment failed", res.status, err?.category, err?.code);
+    if (res.status === 401) {
+      // Describe the token's shape (never the token) so a bad paste is easy to spot
+      const raw = String(env.SQUARE_ACCESS_TOKEN || "");
+      console.log("Square token check", {
+        length: token.length,
+        startsWithEAAA: token.startsWith("EAAA"),
+        hadExtraWhitespace: raw !== token,
+        looksMasked: /^[•*.\s]+$/.test(token),
+        env: env.SQUARE_ENV === "production" ? "production" : "sandbox",
+      });
+    }
     if (err?.category === "PAYMENT_METHOD_ERROR") {
       return json({ error: "Your card was declined. Please check the details or try another card." }, 402);
     }
