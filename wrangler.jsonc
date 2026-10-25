@@ -1,0 +1,21 @@
+// Cloudflare Worker config for wurstwerk.party.
+// Static files are served from public/; worker.js only handles /api/*.
+{
+  "name": "wurstwerk",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "routes": [
+    { "pattern": "wurstwerk.party", "custom_domain": true },
+    { "pattern": "www.wurstwerk.party", "custom_domain": true },
+    { "pattern": "wurstwerk.wurstwerk.party", "custom_domain": true }
+  ],
+  "workers_dev": true,
+  "preview_urls": true,
+  // Keep the Square variables set in the Cloudflare dashboard across deploys
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}

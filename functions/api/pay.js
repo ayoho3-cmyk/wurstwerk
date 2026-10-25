@@ -1,6 +1,6 @@
 // POST /api/pay — charges a Square card token for the cart.
-// The total is always computed here from menu.json, never trusted from the browser.
-import menu from "../../menu.json";
+// The total is always computed here from public/menu.json, never trusted from the browser.
+import menu from "../../public/menu.json";
 
 const ITEMS = Object.fromEntries(menu.categories.flatMap(c => c.items).map(i => [i.id, i]));
 const SQUARE_VERSION = "2024-10-17";
