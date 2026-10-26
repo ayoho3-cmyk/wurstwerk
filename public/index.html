@@ -98,7 +98,9 @@
   .cart ul { list-style: none; padding: 0; margin: 0 0 12px; font-size: 15px; }
   .cart li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed rgba(18,17,16,.2); }
   .cart .empty { color: #7a6f5d; font-style: italic; }
-  .cart .total { display: flex; justify-content: space-between; font-weight: 700; font-size: 20px; margin: 10px 0 16px; }
+  .cart .sub[hidden] { display: none; }
+  .cart .sub { display: flex; justify-content: space-between; font-size: 15px; color: #4d4436; margin-top: 4px; }
+  .cart .total { display: flex; justify-content: space-between; font-weight: 700; font-size: 20px; margin: 8px 0 16px; padding-top: 6px; border-top: 1px solid rgba(18,17,16,.2); }
   .cart label { display: block; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 4px; }
   .cart input, .cart select, .cart textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #cbb994; background: #fffaf0; font: 15px "Work Sans", sans-serif; color: var(--ink); }
   .cart input:focus, .cart select:focus, .cart textarea:focus { outline: 2px solid var(--red); outline-offset: 1px; }
@@ -178,6 +180,8 @@
         <aside class="cart" aria-labelledby="cart-h">
           <h3 id="cart-h">Your Order</h3>
           <ul id="cart-list"><li class="empty">Nothing yet — add some sausage!</li></ul>
+          <div class="sub"><span>Subtotal</span><span id="cart-sub">$0.00</span></div>
+          <div class="sub" id="tax-row"><span id="tax-label">Tax</span><span id="cart-tax">$0.00</span></div>
           <div class="total"><span>Total</span><span id="cart-total">$0.00</span></div>
           <form id="order-form">
             <label for="f-name">Name</label>
@@ -245,7 +249,7 @@ const CONFIG = {
 
 const cart = {};
 const money = n => "$" + n.toFixed(2);
-let MENU = [], allItems = [];
+let MENU = [], allItems = [], TAX_RATE = 0;   // TAX_RATE is a percent, from menu.json
 let card = null;              // Square card field, when online payment is on
 
 const $ = id => document.getElementById(id);
@@ -281,18 +285,32 @@ $("menu").addEventListener("click", e => {
   renderCart();
 });
 
-function renderCart() {
-  let total = 0;
-  const rows = allItems.filter(i => cart[i.id]).map(i => {
-    const line = cart[i.id] * i.price; total += line;
-    return `<li><span>${cart[i.id]} × ${i.name}</span><span>${money(line)}</span></li>`;
+// Cart totals in cents; tax is rounded per line, the way Square calculates it on the order
+function totals() {
+  let sub = 0, tax = 0;
+  allItems.filter(i => cart[i.id]).forEach(i => {
+    const line = Math.round(i.price * 100) * cart[i.id];
+    sub += line;
+    tax += Math.round(line * TAX_RATE / 100);
   });
+  return { sub, tax, total: sub + tax };
+}
+
+function renderCart() {
+  const rows = allItems.filter(i => cart[i.id]).map(i =>
+    `<li><span>${cart[i.id]} × ${i.name}</span><span>${money(cart[i.id] * i.price)}</span></li>`);
+  const t = totals();
+  const total = t.total / 100;
   allItems.forEach(i => {
     const q = $("q-" + i.id);
     q.textContent = cart[i.id] || 0;
     q.closest(".item").classList.toggle("in-cart", !!cart[i.id]);
   });
   $("cart-list").innerHTML = rows.length ? rows.join("") : '<li class="empty">Nothing yet — add some sausage!</li>';
+  $("cart-sub").textContent = money(t.sub / 100);
+  $("cart-tax").textContent = money(t.tax / 100);
+  $("tax-row").hidden = !TAX_RATE;
+  $("tax-label").textContent = `Tax (${TAX_RATE}%)`;
   $("cart-total").textContent = money(total);
   const btn = $("submit-btn");
   btn.disabled = !rows.length;
@@ -344,7 +362,8 @@ function orderLines() {
 function sendByEmail(f, total) {
   const body = [
     "NEW WURSTWERK ORDER", "",
-    ...orderLines(), "", `TOTAL: ${money(total)}`, "",
+    ...orderLines(), "",
+    `Subtotal: ${money(totals().sub / 100)}`, `Tax (${TAX_RATE}%): ${money(totals().tax / 100)}`, `TOTAL: ${money(total)}`, "",
     `Name: ${f.get("name")}`, `Phone: ${f.get("phone")}`, `Email: ${f.get("email") || "-"}`,
     `Drop-off address: ${f.get("address")}`, `Drop-off time: ${f.get("time")}`, `Notes: ${f.get("notes") || "-"}`
   ].join("\n");
@@ -378,7 +397,7 @@ async function payWithCard(form, f) {
     form.innerHTML = `
       <div class="done">
         <h4>Order placed — thank you!</h4>
-        <p>Paid ${money(data.total / 100)} · Order ${data.reference}</p>
+        <p>Paid ${money(data.total / 100)} (incl. ${money((data.tax || 0) / 100)} tax) · Order ${data.reference}</p>
         <p>We'll drop it off at <strong>${f.get("time")}</strong>.</p>
         ${data.receiptUrl ? `<p><a href="${data.receiptUrl}" target="_blank" rel="noopener">View your receipt</a></p>` : ""}
       </div>`;
@@ -403,6 +422,7 @@ fetch("menu.json", { cache: "no-cache" })
   .then(r => r.json())
   .then(m => {
     MENU = m.categories;
+    TAX_RATE = Number(m.taxRate) || 0;
     allItems = MENU.flatMap(c => c.items);
     renderMenu();
     renderCart();

@@ -21,6 +21,7 @@ Only the `public/` folder is published as website files. No build step.
 ## Editing the menu, prices and emails
 
 - **Menu and prices:** edit `public/menu.json`. Prices are in dollars (e.g. `"price": 10`). Keep each item's `id` unchanged once orders are live.
+- **Sales tax:** `"taxRate"` at the top of `public/menu.json`, as a percent (currently `8.25` for Austin). The cart shows it and Square records it as "Sales Tax" on each order.
 - **Emails and drop-off hours:** open `public/index.html` and find the `EDIT ME` block near the bottom:
   - `orderEmail` — where orders are sent when online payment is off
   - `eventEmail` — where event inquiries go
@@ -57,7 +58,7 @@ Never put the access token in the code or the repository — it only goes in Clo
 
 ## How orders work
 
-**With Square on:** the customer pays by card in the cart. The Worker re-prices the cart from `public/menu.json` and charges it through Square. The payment's note in your Square dashboard holds everything for the drop-off: time, items, name, phone, address and notes.
+**With Square on:** the customer pays by card in the cart. The Worker re-prices the cart from `public/menu.json`, creates an itemized Square **order** with sales tax, and charges exactly the order total — so tax appears in Square's sales-tax reports and receipts list each item. The payment's note in your Square dashboard holds everything for the drop-off: time, items, name, phone, address and notes.
 
 **With Square off:** "Send Order" opens the customer's email app with the full order addressed to `orderEmail`, and customers pay at drop-off.
 
@@ -67,4 +68,4 @@ Never put the access token in the code or the repository — it only goes in Clo
 npx wrangler dev
 ```
 
-Put test values in a `.dev.vars` file (git-ignored) using the same four names.
+Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` to point at a local mock Square API.

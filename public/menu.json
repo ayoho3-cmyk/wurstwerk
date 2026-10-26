@@ -1,16 +1,32 @@
 {
+  "taxRate": 8.25,
   "categories": [
     {
       "cat": "Sausages",
       "items": [
-        { "id": "brat",  "name": "Classic Bratwurst",   "price": 10, "desc": "Berkshire pork on a poppyseed bun, with sauerkraut and spicy mustard." },
-        { "id": "curry", "name": "Currywurst",          "price": 12, "desc": "Berkshire pork currywurst, poppyseed bun, curry ketchup, pepper relish." }
+        {
+          "id": "brat",
+          "name": "Classic Bratwurst",
+          "price": 10,
+          "desc": "Berkshire pork on a poppyseed bun, with sauerkraut and spicy mustard."
+        },
+        {
+          "id": "curry",
+          "name": "Currywurst",
+          "price": 12,
+          "desc": "Berkshire pork currywurst, poppyseed bun, curry ketchup, pepper relish."
+        }
       ]
     },
     {
       "cat": "Sides",
       "items": [
-        { "id": "kart",  "name": "German Potato Salad", "price": 4,  "desc": "Crispy potatoes, bacon mustard vinaigrette, chives." }
+        {
+          "id": "kart",
+          "name": "German Potato Salad",
+          "price": 4,
+          "desc": "Crispy potatoes, bacon mustard vinaigrette, chives."
+        }
       ]
     }
   ]
