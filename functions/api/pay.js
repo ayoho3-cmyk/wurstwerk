@@ -51,15 +51,14 @@ export async function onRequestPost({ request, env }) {
   const name = clean(customer.name, 80);
   const phone = clean(customer.phone, 30);
   const email = clean(customer.email, 120);
-  const time = clean(customer.time, 20);
   const notes = clean(customer.notes, 200);
-  if (!name || !phone || !time) {
-    return json({ error: "Please fill in your name, phone and pickup time." }, 400);
+  if (!name || !phone) {
+    return json({ error: "Please fill in your name and phone." }, 400);
   }
 
   // Everything you need for the pickup, visible on the payment in Square
   const note = [
-    `PICKUP ${time}`,
+    "PICKUP",
     lines.join(", "),
     `${name} ${phone}`,
     notes && `Notes: ${notes}`,

@@ -212,8 +212,6 @@
             <input id="f-phone" name="phone" type="tel" required autocomplete="tel">
             <label for="f-email">Email</label>
             <input id="f-email" name="email" type="email" autocomplete="email">
-            <label for="f-time">Pickup time</label>
-            <select id="f-time" name="time" required></select>
             <label for="f-notes">Notes</label>
             <textarea id="f-notes" name="notes" placeholder="Allergies, extra sauerkraut, etc."></textarea>
             <div id="pay-block" hidden>
@@ -263,7 +261,6 @@
 const CONFIG = {
   orderEmail: "orders@wurstwerk.party",   // where orders are sent (when online payment is off)
   eventEmail: "events@wurstwerk.party",   // where event inquiries go
-  slotMinutes: 15,                        // pickup times run from popup.json "start" to "end"
 };
 /* =========================== */
 
@@ -338,27 +335,15 @@ function renderCart() {
   return total;
 }
 
-// Pickup time slots, from the pop-up's start and end times
 let POPUP = {};
-function renderSlots(start = "11:00", end = "20:00") {
-  const sel = $("f-time");
-  sel.innerHTML = "";
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  for (let m = sh * 60 + sm; m <= eh * 60 + em; m += CONFIG.slotMinutes) {
-    const h = Math.floor(m / 60), mm = String(m % 60).padStart(2, "0");
-    const label = `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`;
-    sel.add(new Option(label, label));
-  }
-}
-renderSlots();
+// Where and when to pick up, e.g. "Honeymoon Spirit Lounge, Sunday, Dec 6, 5 PM – 7 PM"
+const pickupWhere = () => POPUP.show ? [POPUP.place, POPUP.date, POPUP.hours].filter(Boolean).join(", ") : "";
 
 // "Find Us" section, filled from popup.json (hidden while "show" is false)
 fetch("popup.json", { cache: "no-cache" })
   .then(r => r.json())
   .then(p => {
     POPUP = p || {};
-    if (p.start && p.end) renderSlots(p.start, p.end);
     if (!p.show) return;
     const set = (id, v) => { $(id).textContent = v || ""; $(id).hidden = !v; };
     set("pu-date", p.date);
@@ -408,9 +393,9 @@ function sendByEmail(f, total) {
     ...orderLines(), "",
     `Subtotal: ${money(totals().sub / 100)}`, `Tax (${TAX_RATE}%): ${money(totals().tax / 100)}`, `TOTAL: ${money(total)}`, "",
     `Name: ${f.get("name")}`, `Phone: ${f.get("phone")}`, `Email: ${f.get("email") || "-"}`,
-    `Pickup time: ${f.get("time")}`, `Notes: ${f.get("notes") || "-"}`
+    `Pickup: ${pickupWhere() || "at the pop-up"}`, `Notes: ${f.get("notes") || "-"}`
   ].join("\n");
-  const subject = `Pickup order — ${f.get("name")} @ ${f.get("time")}`;
+  const subject = `Pickup order — ${f.get("name")}`;
   location.href = `mailto:${CONFIG.orderEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   toast("Your email app should open with your order — hit send and we'll confirm shortly. Thank you!");
 }
@@ -430,7 +415,7 @@ async function payWithCard(form, f) {
         sourceId: tok.token,
         idempotencyKey: crypto.randomUUID(),
         items: { ...cart },
-        customer: Object.fromEntries(["name", "phone", "email", "time", "notes"].map(k => [k, f.get(k) || ""])),
+        customer: Object.fromEntries(["name", "phone", "email", "notes"].map(k => [k, f.get(k) || ""])),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -441,7 +426,7 @@ async function payWithCard(form, f) {
       <div class="done">
         <h4>Order placed — thank you!</h4>
         <p>Paid ${money(data.total / 100)} (incl. ${money((data.tax || 0) / 100)} tax) · Order ${data.reference}</p>
-        <p>Pick up at <strong>${f.get("time")}</strong>${POPUP.show && POPUP.place ? ` at ${POPUP.place}` : ""}.</p>
+        <p>${pickupWhere() ? `Pick it up at <strong>${pickupWhere()}</strong>.` : "Pick it up at the pop-up."}</p>
         ${data.receiptUrl ? `<p><a href="${data.receiptUrl}" target="_blank" rel="noopener">View your receipt</a></p>` : ""}
       </div>`;
     $("cart-list").innerHTML = lines;
