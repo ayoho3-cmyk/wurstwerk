@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WurstWerk</title>
-<meta name="description" content="WurstWerk — German sausage pop-up. Order bratwurst, currywurst and more, dropped off to your door, or book us for your event.">
+<meta name="description" content="WurstWerk — German sausage pop-up. Order bratwurst, currywurst and more, or book us for your event.">
 <link rel="icon" href="img/favicon.png" type="image/png">
 <meta property="og:image" content="https://wurstwerk.party/img/emblem.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -115,6 +115,15 @@
   .done h4 { font-family: "Bebas Neue"; font-size: 30px; letter-spacing: .05em; color: var(--red); margin: 0 0 6px; }
   .done p { margin: 0 0 8px; font-size: 15px; }
 
+  /* pop-up */
+  .popup { border-block: 2px solid var(--brass); background: radial-gradient(700px 300px at 50% 0%, rgba(255,42,31,.18), transparent 70%), var(--ink-2); text-align: center; padding: 56px 0; }
+  .popup[hidden], .popup [hidden] { display: none; }
+  .popup h2 { font-size: clamp(44px, 6vw, 72px); margin: 6px 0 4px; }
+  .popup .hours { font-family: "Bebas Neue", sans-serif; font-size: clamp(24px, 3vw, 32px); letter-spacing: .06em; color: var(--brass); }
+  .popup .place { font-size: 20px; font-weight: 700; margin: 14px 0 2px; }
+  .popup .addr { color: var(--muted); margin: 0 0 18px; }
+  .popup .note { color: var(--muted); max-width: 56ch; margin: 0 auto 18px; }
+
   /* events */
   .events { position: relative; border-top: 2px solid var(--brass); background: radial-gradient(600px 400px at 25% 50%, rgba(255,42,31,.16), transparent 70%), var(--ink-2); }
   .events .wrap { display: grid; grid-template-columns: .9fr 1.1fr; gap: 48px; align-items: center; }
@@ -161,8 +170,23 @@
     <div class="wrap">
       <h1 style="margin:0"><img class="emblem" src="img/emblem.png" alt="WurstWerk — German Style Sausage" width="825" height="620"></h1>
       <div class="btns">
-        <a class="btn" href="#order">Order Drop-Off</a>
+        <a class="btn" href="#order">Order Now</a>
         <a class="btn ghost" href="#events">Book an Event</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="popup" id="popup" hidden>
+    <div class="wrap">
+      <div class="kicker">Find Us</div>
+      <h2 class="display neon" id="pu-date"></h2>
+      <div class="hours" id="pu-hours"></div>
+      <p class="place" id="pu-place"></p>
+      <p class="addr" id="pu-addr"></p>
+      <p class="note" id="pu-note"></p>
+      <div class="btns">
+        <a class="btn" href="#order">Order Ahead</a>
+        <a class="btn ghost" id="pu-map" href="#" target="_blank" rel="noopener">Get Directions</a>
       </div>
     </div>
   </section>
@@ -171,8 +195,6 @@
     <div class="wrap">
       <div class="section-head">
         <div class="kicker">The Menu</div>
-        <h2 class="display neon">Order for Drop-Off</h2>
-        <p>Choose your sausage, tell us where and when, and we'll drop it off hot. We'll confirm by text or email.</p>
       </div>
       <div class="order-grid">
         <div id="menu"></div>
@@ -190,9 +212,7 @@
             <input id="f-phone" name="phone" type="tel" required autocomplete="tel">
             <label for="f-email">Email</label>
             <input id="f-email" name="email" type="email" autocomplete="email">
-            <label for="f-address">Drop-off address</label>
-            <textarea id="f-address" name="address" required autocomplete="street-address" placeholder="Street, city, zip — plus any gate code or directions"></textarea>
-            <label for="f-time">Drop-off time</label>
+            <label for="f-time">Pickup time</label>
             <select id="f-time" name="time" required></select>
             <label for="f-notes">Notes</label>
             <textarea id="f-notes" name="notes" placeholder="Allergies, extra sauerkraut, etc."></textarea>
@@ -201,7 +221,7 @@
               <div id="card-container"></div>
             </div>
             <button class="btn" id="submit-btn" type="submit" disabled>Send Order</button>
-            <p class="fine" id="fine">Pay at drop-off. Orders are confirmed once we reply.</p>
+            <p class="fine" id="fine">Pay at pickup. Orders are confirmed once we reply.</p>
             <div class="toast" id="toast" role="status"></div>
           </form>
         </aside>
@@ -241,9 +261,9 @@
 /* ========= EDIT ME ========= */
 // Menu items and prices live in menu.json (the payment code reads the same file).
 const CONFIG = {
-  orderEmail: "orders@wurstwerk.party",   // where drop-off orders are sent (when online payment is off)
+  orderEmail: "orders@wurstwerk.party",   // where orders are sent (when online payment is off)
   eventEmail: "events@wurstwerk.party",   // where event inquiries go
-  dropoffStart: "11:00", dropoffEnd: "20:00", slotMinutes: 15,
+  slotMinutes: 15,                        // pickup times run from popup.json "start" to "end"
 };
 /* =========================== */
 
@@ -318,17 +338,40 @@ function renderCart() {
   return total;
 }
 
-// Drop-off time slots
-(function () {
+// Pickup time slots, from the pop-up's start and end times
+let POPUP = {};
+function renderSlots(start = "11:00", end = "20:00") {
   const sel = $("f-time");
-  const [sh, sm] = CONFIG.dropoffStart.split(":").map(Number);
-  const [eh, em] = CONFIG.dropoffEnd.split(":").map(Number);
+  sel.innerHTML = "";
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
   for (let m = sh * 60 + sm; m <= eh * 60 + em; m += CONFIG.slotMinutes) {
     const h = Math.floor(m / 60), mm = String(m % 60).padStart(2, "0");
     const label = `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? "AM" : "PM"}`;
     sel.add(new Option(label, label));
   }
-})();
+}
+renderSlots();
+
+// "Find Us" section, filled from popup.json (hidden while "show" is false)
+fetch("popup.json", { cache: "no-cache" })
+  .then(r => r.json())
+  .then(p => {
+    POPUP = p || {};
+    if (p.start && p.end) renderSlots(p.start, p.end);
+    if (!p.show) return;
+    const set = (id, v) => { $(id).textContent = v || ""; $(id).hidden = !v; };
+    set("pu-date", p.date);
+    set("pu-hours", p.hours);
+    set("pu-place", p.place);
+    set("pu-addr", p.address);
+    set("pu-note", p.note);
+    const map = $("pu-map");
+    map.hidden = !p.address;
+    map.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([p.place, p.address].filter(Boolean).join(", "));
+    $("popup").hidden = false;
+  })
+  .catch(() => {});
 
 // Turn on Square card payments if the server has them configured; otherwise stay on email ordering.
 async function setupPayments() {
@@ -365,9 +408,9 @@ function sendByEmail(f, total) {
     ...orderLines(), "",
     `Subtotal: ${money(totals().sub / 100)}`, `Tax (${TAX_RATE}%): ${money(totals().tax / 100)}`, `TOTAL: ${money(total)}`, "",
     `Name: ${f.get("name")}`, `Phone: ${f.get("phone")}`, `Email: ${f.get("email") || "-"}`,
-    `Drop-off address: ${f.get("address")}`, `Drop-off time: ${f.get("time")}`, `Notes: ${f.get("notes") || "-"}`
+    `Pickup time: ${f.get("time")}`, `Notes: ${f.get("notes") || "-"}`
   ].join("\n");
-  const subject = `Drop-off order — ${f.get("name")} @ ${f.get("time")}`;
+  const subject = `Pickup order — ${f.get("name")} @ ${f.get("time")}`;
   location.href = `mailto:${CONFIG.orderEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   toast("Your email app should open with your order — hit send and we'll confirm shortly. Thank you!");
 }
@@ -387,7 +430,7 @@ async function payWithCard(form, f) {
         sourceId: tok.token,
         idempotencyKey: crypto.randomUUID(),
         items: { ...cart },
-        customer: Object.fromEntries(["name", "phone", "email", "address", "time", "notes"].map(k => [k, f.get(k) || ""])),
+        customer: Object.fromEntries(["name", "phone", "email", "time", "notes"].map(k => [k, f.get(k) || ""])),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -398,7 +441,7 @@ async function payWithCard(form, f) {
       <div class="done">
         <h4>Order placed — thank you!</h4>
         <p>Paid ${money(data.total / 100)} (incl. ${money((data.tax || 0) / 100)} tax) · Order ${data.reference}</p>
-        <p>We'll drop it off at <strong>${f.get("time")}</strong>.</p>
+        <p>Pick up at <strong>${f.get("time")}</strong>${POPUP.show && POPUP.place ? ` at ${POPUP.place}` : ""}.</p>
         ${data.receiptUrl ? `<p><a href="${data.receiptUrl}" target="_blank" rel="noopener">View your receipt</a></p>` : ""}
       </div>`;
     $("cart-list").innerHTML = lines;

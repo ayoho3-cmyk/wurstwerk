@@ -1,6 +1,6 @@
 # WurstWerk
 
-Website for WurstWerk — German style sausage, dropped off to your door. Live at **https://wurstwerk.party**.
+Website for WurstWerk — German style sausage, at WurstWerk pop-ups. Live at **https://wurstwerk.party**.
 
 The code lives on GitHub. A Cloudflare **Worker** named `wurstwerk` (Workers Builds, connected to this repo) runs `npx wrangler deploy` on every push to `main`, so commits go live in about a minute. Cloudflare also runs the domain's DNS and forwards the site's email addresses.
 
@@ -8,8 +8,9 @@ The code lives on GitHub. A Cloudflare **Worker** named `wurstwerk` (Workers Bui
 
 | Path | Purpose |
 |---|---|
-| `public/index.html` | The whole site: landing, drop-off ordering, event booking |
+| `public/index.html` | The whole site: landing, pop-up info, pickup ordering, event booking |
 | `public/menu.json` | Menu items, prices and descriptions (read by the page *and* the payment code) |
+| `public/popup.json` | Next pop-up: date, hours, place, address, pickup time range |
 | `public/img/` | Logos (emblem, neon badge, butcher badge, favicon) |
 | `worker.js` | Worker entry: sends `/api/*` to the payment code, everything else to `public/` |
 | `functions/api/config.js` | Tells the page whether Square payments are switched on |
@@ -22,10 +23,14 @@ Only the `public/` folder is published as website files. No build step.
 
 - **Menu and prices:** edit `public/menu.json`. Prices are in dollars (e.g. `"price": 10`). Keep each item's `id` unchanged once orders are live.
 - **Sales tax:** `"taxRate"` at the top of `public/menu.json`, as a percent (currently `8.25` for Austin). The cart shows it and Square records it as "Sales Tax" on each order.
-- **Emails and drop-off hours:** open `public/index.html` and find the `EDIT ME` block near the bottom:
+- **Next pop-up ("Find Us" section):** edit `public/popup.json`:
+  - `show` — `true` to display the section, `false` to hide it
+  - `date`, `hours`, `place`, `address`, `note` — text shown on the site ("Get Directions" opens Google Maps for `place` + `address`)
+  - `start` / `end` — 24-hour times (e.g. `"11:00"`, `"15:00"`) that set the pickup time choices
+- **Emails:** open `public/index.html` and find the `EDIT ME` block near the bottom:
   - `orderEmail` — where orders are sent when online payment is off
   - `eventEmail` — where event inquiries go
-  - `dropoffStart` / `dropoffEnd` / `slotMinutes` — drop-off time slots
+  - `slotMinutes` — gap between pickup times
 
 To change a file on github.com: open it, click the pencil icon, edit, then **Commit changes**. Cloudflare deploys the update within about a minute.
 
@@ -37,7 +42,7 @@ To change a file on github.com: open it, click the pencil icon, edit, then **Com
 
 ## Square payments
 
-Until all four values are set, the site automatically falls back to email ordering (pay at drop-off).
+Until all four values are set, the site automatically falls back to email ordering (pay at pickup).
 
 1. Square Developer Console → app **WurstWerk Website** → **Credentials** / **Locations**.
 2. Cloudflare → **Workers & Pages → wurstwerk → Settings → Variables and Secrets → Add**:
@@ -58,9 +63,9 @@ Never put the access token in the code or the repository — it only goes in Clo
 
 ## How orders work
 
-**With Square on:** the customer pays by card in the cart. The Worker re-prices the cart from `public/menu.json`, creates an itemized Square **order** with sales tax, and charges exactly the order total — so tax appears in Square's sales-tax reports and receipts list each item. The payment's note in your Square dashboard holds everything for the drop-off: time, items, name, phone, address and notes.
+**With Square on:** the customer pays by card in the cart. The Worker re-prices the cart from `public/menu.json`, creates an itemized Square **order** with sales tax, and charges exactly the order total — so tax appears in Square's sales-tax reports and receipts list each item. The payment's note in your Square dashboard holds everything for the pickup: time, items, name, phone and notes.
 
-**With Square off:** "Send Order" opens the customer's email app with the full order addressed to `orderEmail`, and customers pay at drop-off.
+**With Square off:** "Send Order" opens the customer's email app with the full order addressed to `orderEmail`, and customers pay at pickup.
 
 ## Local testing
 

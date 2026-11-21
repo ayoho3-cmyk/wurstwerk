@@ -51,19 +51,17 @@ export async function onRequestPost({ request, env }) {
   const name = clean(customer.name, 80);
   const phone = clean(customer.phone, 30);
   const email = clean(customer.email, 120);
-  const address = clean(customer.address, 200);
   const time = clean(customer.time, 20);
   const notes = clean(customer.notes, 200);
-  if (!name || !phone || !address || !time) {
-    return json({ error: "Please fill in your name, phone, address and drop-off time." }, 400);
+  if (!name || !phone || !time) {
+    return json({ error: "Please fill in your name, phone and pickup time." }, 400);
   }
 
-  // Everything you need for the drop-off, visible on the payment in Square
+  // Everything you need for the pickup, visible on the payment in Square
   const note = [
-    `DROP-OFF ${time}`,
+    `PICKUP ${time}`,
     lines.join(", "),
     `${name} ${phone}`,
-    `Addr: ${address}`,
     notes && `Notes: ${notes}`,
   ].filter(Boolean).join(" | ").slice(0, 500);
 
