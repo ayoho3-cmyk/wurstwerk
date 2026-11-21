@@ -10,7 +10,24 @@ const json = (data, status = 200) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const clean = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
-export async function onRequestPost({ request, env }) {
+// Phone alert for each paid order via Pushover. Optional: skipped unless both secrets are set,
+// and a failure here never affects the order.
+async function notifyOwner(env, { title, message }) {
+  const token = String(env.PUSHOVER_TOKEN || "").trim();
+  const user = String(env.PUSHOVER_USER || "").trim();
+  if (!token || !user) return;
+  try {
+    const res = await fetch(`${env.PUSHOVER_API_BASE || "https://api.pushover.net"}/1/messages.json`, {
+      method: "POST",
+      body: new URLSearchParams({ token, user, title, message, priority: "1", sound: "cashregister" }),
+    });
+    if (!res.ok) console.log("Pushover alert failed", res.status, (await res.text()).slice(0, 200));
+  } catch (err) {
+    console.log("Pushover alert failed", String(err));
+  }
+}
+
+export async function onRequestPost({ request, env, waitUntil = () => {} }) {
   // Trim stray spaces/newlines that sneak in when pasting the token into the dashboard
   const token = String(env.SQUARE_ACCESS_TOKEN || "").trim();
   const locationId = String(env.SQUARE_LOCATION_ID || "").trim();
@@ -130,6 +147,11 @@ export async function onRequestPost({ request, env }) {
 
     const p = await square("/v2/payments", payment);
     if (!p.res.ok || p.data.payment?.status !== "COMPLETED") return fail("payment", p.res, p.data);
+
+    waitUntil(notifyOwner(env, {
+      title: `New WurstWerk order $${(total / 100).toFixed(2)}`,
+      message: [lines.join("\n"), `${name} · ${phone}`, notes && `Notes: ${notes}`, reference].filter(Boolean).join("\n"),
+    }));
 
     return json({
       ok: true,

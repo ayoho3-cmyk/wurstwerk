@@ -60,6 +60,18 @@ Until all four values are set, the site automatically falls back to email orderi
 
 Never put the access token in the code or the repository — it only goes in Cloudflare as a Secret.
 
+## Order alerts (Pushover)
+
+After each successful card payment, the Worker sends a high-priority push notification to your phone with the total, items, customer name and phone, and notes. It is skipped until both secrets are set, and an alert failure never affects the order.
+
+1. Install the **Pushover** app on your phone and create an account at **pushover.net**.
+2. On pushover.net, copy **Your User Key** (top of the dashboard).
+3. Click **Create an Application/API Token**, name it "WurstWerk", and copy the **API Token/Key**.
+4. Cloudflare → **Workers & Pages → wurstwerk → Settings → Variables and Secrets → Add**, both as **Secret**:
+   - `PUSHOVER_USER` — your User Key
+   - `PUSHOVER_TOKEN` — the application's API Token
+5. **Deploy**, then place a real order to test.
+
 ## How orders work
 
 **With Square on:** the customer pays by card in the cart. The Worker re-prices the cart from `public/menu.json`, creates an itemized Square **order** with sales tax, and charges exactly the order total — so tax appears in Square's sales-tax reports and receipts list each item. The payment's note in your Square dashboard holds everything for the pickup: items, name, phone and notes.
@@ -72,4 +84,4 @@ Never put the access token in the code or the repository — it only goes in Clo
 npx wrangler dev
 ```
 
-Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` to point at a local mock Square API.
+Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` / `PUSHOVER_API_BASE` to point at local mock APIs.
