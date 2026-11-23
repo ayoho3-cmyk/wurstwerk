@@ -60,9 +60,20 @@ Until all four values are set, the site automatically falls back to email orderi
 
 Never put the access token in the code or the repository — it only goes in Cloudflare as a Secret.
 
-## Order alerts (Pushover)
+## Order alerts (Telegram and/or Pushover)
 
-After each successful card payment, the Worker sends a high-priority push notification to your phone with the total, items, customer name and phone, and notes. It is skipped until both secrets are set, and an alert failure never affects the order.
+After each successful card payment, the Worker sends the total, items, customer name and phone, and notes to your phone. Each channel is skipped until its secrets are set, and an alert failure never affects the order. Failures show in the Worker logs as "Telegram alert failed" / "Pushover alert failed".
+
+### Telegram
+1. In Telegram, message **@BotFather** → `/newbot` → pick a name and a username ending in `bot`. Copy the **bot token** it gives you.
+2. Open your new bot and press **Start** (a bot can only message people who have started it).
+3. Get your chat ID: message **@userinfobot** and copy the **Id** number it replies with.
+4. Cloudflare → wurstwerk → Settings → Variables and Secrets → Add, both as **Secret**:
+   - `TELEGRAM_BOT_TOKEN` — the token from BotFather
+   - `TELEGRAM_CHAT_ID` — your Id number
+5. Deploy, then place a real order to test.
+
+### Pushover
 
 1. Install the **Pushover** app on your phone and create an account at **pushover.net**.
 2. On pushover.net, copy **Your User Key** (top of the dashboard).
@@ -84,4 +95,4 @@ After each successful card payment, the Worker sends a high-priority push notifi
 npx wrangler dev
 ```
 
-Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` / `PUSHOVER_API_BASE` to point at local mock APIs.
+Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` / `TELEGRAM_API_BASE` / `PUSHOVER_API_BASE` to point at local mock APIs.

@@ -10,21 +10,42 @@ const json = (data, status = 200) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const clean = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
-// Phone alert for each paid order via Pushover. Optional: skipped unless both secrets are set,
-// and a failure here never affects the order.
-async function notifyOwner(env, { title, message }) {
-  const token = String(env.PUSHOVER_TOKEN || "").trim();
-  const user = String(env.PUSHOVER_USER || "").trim();
-  if (!token || !user) return;
+// Phone alerts for each paid order, via Telegram and/or Pushover. Each channel is optional
+// (skipped unless its secrets are set), and a failure here never affects the order.
+async function sendAlert(label, request) {
   try {
-    const res = await fetch(`${env.PUSHOVER_API_BASE || "https://api.pushover.net"}/1/messages.json`, {
-      method: "POST",
-      body: new URLSearchParams({ token, user, title, message, priority: "1", sound: "cashregister" }),
-    });
-    if (!res.ok) console.log("Pushover alert failed", res.status, (await res.text()).slice(0, 200));
+    const res = await request();
+    if (!res.ok) console.log(`${label} alert failed`, res.status, (await res.text()).slice(0, 200));
   } catch (err) {
-    console.log("Pushover alert failed", String(err));
+    console.log(`${label} alert failed`, String(err));
   }
+}
+
+async function notifyOwner(env, { title, message }) {
+  const sends = [];
+
+  const tgToken = String(env.TELEGRAM_BOT_TOKEN || "").trim();
+  const tgChat = String(env.TELEGRAM_CHAT_ID || "").trim();
+  if (tgToken && tgChat) {
+    sends.push(sendAlert("Telegram", () =>
+      fetch(`${env.TELEGRAM_API_BASE || "https://api.telegram.org"}/bot${tgToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: tgChat, text: `🌭 ${title}\n\n${message}` }),
+      })));
+  }
+
+  const poToken = String(env.PUSHOVER_TOKEN || "").trim();
+  const poUser = String(env.PUSHOVER_USER || "").trim();
+  if (poToken && poUser) {
+    sends.push(sendAlert("Pushover", () =>
+      fetch(`${env.PUSHOVER_API_BASE || "https://api.pushover.net"}/1/messages.json`, {
+        method: "POST",
+        body: new URLSearchParams({ token: poToken, user: poUser, title, message, priority: "1", sound: "cashregister" }),
+      })));
+  }
+
+  await Promise.all(sends);
 }
 
 export async function onRequestPost({ request, env, waitUntil = () => {} }) {
