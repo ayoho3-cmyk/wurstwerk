@@ -60,11 +60,10 @@ Until all four values are set, the site automatically falls back to email orderi
 
 Never put the access token in the code or the repository — it only goes in Cloudflare as a Secret.
 
-## Order alerts (Telegram and/or Pushover)
+## Order alerts (Telegram)
 
-After each successful card payment, the Worker sends the total, items, customer name and phone, and notes to your phone. Each channel is skipped until its secrets are set, and an alert failure never affects the order. Failures show in the Worker logs as "Telegram alert failed" / "Pushover alert failed".
+After each successful card payment, the Worker sends the total, items, customer name and phone, and notes to your Telegram. It is skipped until both secrets are set, and an alert failure never affects the order. Failures show in the Worker logs as "Telegram alert failed".
 
-### Telegram
 1. In Telegram, message **@BotFather** → `/newbot` → pick a name and a username ending in `bot`. Copy the **bot token** it gives you.
 2. Open your new bot and press **Start** (a bot can only message people who have started it).
 3. Get your chat ID: message **@userinfobot** and copy the **Id** number it replies with.
@@ -72,16 +71,6 @@ After each successful card payment, the Worker sends the total, items, customer 
    - `TELEGRAM_BOT_TOKEN` — the token from BotFather
    - `TELEGRAM_CHAT_ID` — your Id number
 5. Deploy, then place a real order to test.
-
-### Pushover
-
-1. Install the **Pushover** app on your phone and create an account at **pushover.net**.
-2. On pushover.net, copy **Your User Key** (top of the dashboard).
-3. Click **Create an Application/API Token**, name it "WurstWerk", and copy the **API Token/Key**.
-4. Cloudflare → **Workers & Pages → wurstwerk → Settings → Variables and Secrets → Add**, both as **Secret**:
-   - `PUSHOVER_USER` — your User Key
-   - `PUSHOVER_TOKEN` — the application's API Token
-5. **Deploy**, then place a real order to test.
 
 ## How orders work
 
@@ -95,4 +84,4 @@ After each successful card payment, the Worker sends the total, items, customer 
 npx wrangler dev
 ```
 
-Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` / `TELEGRAM_API_BASE` / `PUSHOVER_API_BASE` to point at local mock APIs.
+Put test values in a `.dev.vars` file (git-ignored) using the same four names. Optionally set `SQUARE_API_BASE` / `TELEGRAM_API_BASE` to point at local mock APIs.
